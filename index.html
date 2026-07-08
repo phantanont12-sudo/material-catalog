@@ -132,7 +132,7 @@ function buildProv(){
   provSel.value=provCode;
 }
 async function loadManifest(){
-  try{const r=await fetch('data/manifest.json');if(r.ok)manifest=await r.json()}catch(e){}
+  try{const r=await fetch('manifest.json');if(r.ok)manifest=await r.json()}catch(e){}
   buildProv();
 }
 let provIsAlias=false;
@@ -141,7 +141,7 @@ async function switchProv(code){
   if(code==='10'){provData=BKK}
   else if(manifest.available[code]==='bkk'){provData=BKK;provIsAlias=true}
   else if(manifest.available[code]){
-    try{const r=await fetch('data/'+manifest.available[code]);if(r.ok)provData=await r.json()}catch(e){}
+    try{const r=await fetch(manifest.available[code]);if(r.ok)provData=await r.json()}catch(e){}
   }
   render();
 }
