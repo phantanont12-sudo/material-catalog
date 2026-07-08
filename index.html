@@ -83,6 +83,17 @@ main{padding:16px 20px 60px}
 .pv small{display:block;font-size:11.5px;color:var(--mut)}
 .pv:hover{border-color:var(--green);background:var(--ok-bg)}
 .pv.cur{border:2px solid var(--green);background:var(--ok-bg);font-weight:700}
+.pick{white-space:nowrap;border:1.5px solid var(--line);color:var(--mut);background:var(--card);padding:9px 13px;border-radius:10px;font:inherit;font-size:14px;cursor:pointer}
+.pick.on{border-color:var(--green);color:var(--ok);background:var(--ok-bg);font-weight:600}
+.seltop{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.tab{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+.tab small{color:var(--mut)}
+.tab.on{background:var(--green);border-color:var(--green);color:#fff}
+.tab.on small{color:var(--gold-soft)}
+.rm{border:none;background:none;color:#A4472E;font-size:18px;cursor:pointer;padding:4px 8px}
+.sv-min{font-size:13.5px;color:var(--ok);font-weight:600}
+.sv-none{font-size:13.5px;color:var(--warn)}
 </style>
 </head>
 <body>
@@ -100,6 +111,7 @@ main{padding:16px 20px 60px}
   <div class="controls">
     <button class="btn" id="provBtn" style="font-weight:600">📍 เลือกจังหวัด</button>
     <input id="q" type="search" placeholder="ค้นหาวัสดุ เช่น มวลเบา, THW, ลอนคู่ …">
+    <button class="btn" id="selBtn">📋 เลือกแล้ว (0)</button>
   </div>
   <div class="chips" id="chips"></div>
 </div></div>
@@ -227,6 +239,71 @@ function esc(s){return s.replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 function gq(name,site){const clean=name.replace(/มอก\.\s*[\d-]+/g,'').replace(/\s+/g,' ').trim().slice(0,80);
   return 'https://www.google.com/search?q='+encodeURIComponent(clean+(site?' site:'+site:''))+(site?'':'&tbm=isch')}
 
+// ---------- รายการวัสดุที่เลือก ----------
+const selBtn=$('selBtn');
+let selTab='p';
+function getSel(){try{return JSON.parse(localStorage.getItem('selection')||'[]')}catch(e){return[]}}
+function setSel(a){try{localStorage.setItem('selection',JSON.stringify(a))}catch(e){}}
+function inSel(name){return getSel().some(x=>x.name===name)}
+function toggleSel(it,btn){
+  let a=getSel();const i=a.findIndex(x=>x.name===it.name);
+  if(i>=0)a.splice(i,1);else a.push(it);
+  setSel(a);updateSelBtn();
+  if(btn){btn.className='pick'+(i<0?' on':'');btn.textContent=i<0?'✓ เลือกแล้ว':'＋ เลือก'}
+}
+function updateSelBtn(){selBtn.textContent='📋 เลือกแล้ว ('+getSel().length+')'}
+function minSurvey(name){
+  const s=loadSaved()[name];if(!s)return null;
+  const v=s.p.map(parseFloat).filter(x=>x>0);
+  return v.length?{min:Math.min(...v),d:s.d}:null;
+}
+selBtn.onclick=renderSel;
+function renderSel(){
+  notice.innerHTML='';more.hidden=true;
+  const a=getSel();
+  const tabs=[['p','① ราคาจังหวัด'],['b','② ราคา กทม.'],['s','③ สืบราคา 3 ร้าน']];
+  let h='<div class="seltop"><button class="btn" id="backBtn">← กลับไปค้นหา</button><div class="tabs">';
+  tabs.forEach(t=>{const n=a.filter(x=>x.src===t[0]).length;
+    h+='<button class="tab'+(selTab===t[0]?' on':'')+'" data-t="'+t[0]+'">'+t[1]+' <small>'+n+'</small></button>'});
+  h+='</div><button class="btn" id="copyBtn">📄 คัดลอกหน้านี้</button></div>';
+  list.innerHTML=h;
+  meta.textContent='วัสดุที่เลือกไว้ทั้งหมด '+a.length+' รายการ · หน้านี้แสดงเฉพาะแหล่งราคาที่เลือก';
+  const cur=a.filter(x=>x.src===selTab);
+  if(!cur.length)list.insertAdjacentHTML('beforeend','<div class="empty">ยังไม่มีวัสดุในหน้านี้<br>กด "＋ เลือก" ที่รายการวัสดุในหน้าค้นหา แล้วรายการจะมาเก็บที่นี่ตามแหล่งราคา</div>');
+  cur.forEach((it,i)=>{
+    const d=document.createElement('div');d.className='item';
+    let priceHtml='';
+    if(selTab==='s'){
+      const m=minSurvey(it.name);
+      priceHtml=m?'<div class="price"><b>'+m.min.toLocaleString()+'</b><span class="sv-min">ราคาสืบต่ำสุด · '+m.d+'</span></div>'
+                 :'<div class="price"><span class="sv-none">ยังไม่ได้กรอกราคาสืบ</span></div>';
+    }else{
+      priceHtml='<div class="price"><b>'+it.price+'</b><span>บาท / '+it.unit+'</span></div>';
+    }
+    d.innerHTML='<div class="top"><div class="txt"><div class="name">'+it.name+'</div>'+
+      (selTab==='p'?'<span class="tag src-p">ราคาจังหวัด'+(it.prov||'')+'</span>':selTab==='b'?'<span class="tag src-b">ราคา กทม. (ใช้แทน)</span>':'<span class="tag src-b">สืบราคาเอง</span>')+
+      '</div>'+priceHtml+
+      '<div class="act">'+(selTab==='s'?'<button class="survey-btn">🏪 สืบ 3 ร้าน</button>':'')+
+      '<button class="rm" title="เอาออก">✕</button></div></div>'+
+      '<div class="panel" id="sp'+i+'"></div>';
+    d.querySelector('.rm').onclick=()=>{toggleSel(it);renderSel()};
+    const sb=d.querySelector('.survey-btn');
+    if(sb)sb.onclick=()=>togglePanel('sp'+i,it.name);
+    list.appendChild(d);
+  });
+  list.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{selTab=t.dataset.t;renderSel()});
+  $('backBtn').onclick=render;
+  $('copyBtn').onclick=()=>{
+    const rows=cur.map(it=>{
+      let p=it.price||'';
+      if(selTab==='s'){const m=minSurvey(it.name);p=m?m.min:''}
+      return it.name+'\t'+(it.unit||'')+'\t'+p;
+    });
+    const head='รายการ\tหน่วย\tราคา ('+(selTab==='p'?'จังหวัด':selTab==='b'?'กทม.':'สืบ 3 ร้าน')+')';
+    navigator.clipboard.writeText(head+'\n'+rows.join('\n')).then(()=>{$('copyBtn').textContent='✓ คัดลอกแล้ว';setTimeout(()=>$('copyBtn').textContent='📄 คัดลอกหน้านี้',1500)});
+  };
+}
+
 // ---------- rows ----------
 function row(o,idx){
   const r=o.r,d=document.createElement('div');d.className='item';
@@ -235,9 +312,13 @@ function row(o,idx){
   d.innerHTML='<div class="top"><div class="txt"><div class="name">'+r[1]+'</div>'+
     srcTag+'<span class="tag cat">หมวด '+String(r[0]).padStart(2,'0')+' · '+CATS[r[0]]+'</span></div>'+
     '<div class="price"><b>'+r[3]+'</b><span>บาท / '+r[2]+'</span></div>'+
-    '<div class="act"><a class="pic" target="_blank" rel="noopener" href="'+gq(r[1])+'">📷 รูป</a>'+
+    '<div class="act"><button class="pick'+(inSel(r[1])?' on':'')+'">'+(inSel(r[1])?'✓ เลือกแล้ว':'＋ เลือก')+'</button>'+
+    '<a class="pic" target="_blank" rel="noopener" href="'+gq(r[1])+'">📷 รูป</a>'+
     '<button class="survey-btn">🏪 สืบ 3 ร้าน</button></div></div>'+
     '<div class="panel" id="pn'+idx+'"></div>';
+  d.querySelector('.pick').onclick=function(){
+    toggleSel({name:r[1],unit:r[2],price:r[3],cat:r[0],src:o.src,prov:o.src==='p'?PROVINCES[provCode]:''},this);
+  };
   d.querySelector('.survey-btn').onclick=()=>togglePanel('pn'+idx,r[1]);
   return d;
 }
@@ -278,7 +359,9 @@ window.freeSurvey=()=>{
   const name=q.value.trim();if(!name)return;
   list.innerHTML='';const d=document.createElement('div');d.className='item';
   d.innerHTML='<div class="top"><div class="txt"><div class="name">'+esc(name)+'</div>'+
-    '<span class="tag src-b">ไม่มีในฐานข้อมูล — สืบราคาเอง</span></div></div><div class="panel open" id="pnF"></div>';
+    '<span class="tag src-b">ไม่มีในฐานข้อมูล — สืบราคาเอง</span></div>'+
+    '<div class="act"><button class="pick'+(inSel(name)?' on':'')+'">'+(inSel(name)?'✓ เลือกแล้ว':'＋ เลือกเข้าหน้าสืบราคา')+'</button></div></div><div class="panel open" id="pnF"></div>';
+  d.querySelector('.pick').onclick=function(){toggleSel({name:name,unit:'',price:'',cat:0,src:'s',prov:''},this)};
   list.appendChild(d);
   const pn=document.getElementById('pnF');pn.innerHTML=panelHTML(name);wirePanel(pn,name);
   more.hidden=true;
@@ -295,6 +378,7 @@ function page(){
 more.onclick=page;
 let t;q.oninput=()=>{clearTimeout(t);t=setTimeout(render,200)};
 
+updateSelBtn();
 loadManifest().then(()=>{
   const saved=getPref();
   if(saved&&PROVINCES[saved]){switchProv(saved)}
