@@ -130,9 +130,11 @@ async function loadManifest(){
   try{const r=await fetch('data/manifest.json');if(r.ok)manifest=await r.json()}catch(e){}
   buildProv();
 }
+let provIsAlias=false;
 async function switchProv(code){
-  provCode=code;provData=null;
+  provCode=code;provData=null;provIsAlias=false;
   if(code==='10'){provData=BKK}
+  else if(manifest.available[code]==='bkk'){provData=BKK;provIsAlias=true}
   else if(manifest.available[code]){
     try{const r=await fetch('data/'+manifest.available[code]);if(r.ok)provData=await r.json()}catch(e){}
   }
@@ -187,7 +189,7 @@ function gq(name,site){const clean=name.replace(/มอก\.\s*[\d-]+/g,'').repl
 // ---------- rows ----------
 function row(o,idx){
   const r=o.r,d=document.createElement('div');d.className='item';
-  const srcTag=o.src==='p'?'<span class="tag src-p">ราคาจังหวัด'+(provCode==='10'?' กทม.':PROVINCES[provCode])+'</span>'
+  const srcTag=o.src==='p'?'<span class="tag src-p">ราคาจังหวัด'+(provCode==='10'?' กทม.':PROVINCES[provCode])+(provIsAlias?' (อ้างอิงส่วนกลาง กทม.)':'')+'</span>'
                           :'<span class="tag src-b">ราคา กทม. (ใช้แทน)</span>';
   d.innerHTML='<div class="top"><div class="txt"><div class="name">'+r[1]+'</div>'+
     srcTag+'<span class="tag cat">หมวด '+String(r[0]).padStart(2,'0')+' · '+CATS[r[0]]+'</span></div>'+
